@@ -22,7 +22,6 @@ struct A1
 		return id == other.id;
 	}
 };
-
 bool addItem(vector<A1>& vec, int id, string str)
 {
 	A1 a(id);
@@ -59,6 +58,12 @@ bool addItem(vector<A1>& vec, int id, string str)
 }
 int testItrPtr()
 {
+	A1 a(1), b(2);
+	A1& r = a;
+	r.id = 11;
+	r = b;	// still point to a, but not b
+	r.id = 21;
+
 	vector<A1> list;
 	addItem(list, 1, "CHN");
 	addItem(list, 1, "CHT");
@@ -69,12 +74,33 @@ int testItrPtr()
 	return 0;
 }
 
+#include <atomic>
+#include <thread>
+std::atomic_int x, y;
+int r1, r2;
+void writeX() {
+	x.store(1);
+	r1 = y.load();
+}
+void writeY() {
+	y.store(1);
+	r2 = x.load();
+}
+int testAtomic()
+{
+	x = 0;
+	y = 0;
+	std::thread a(writeX);
+	std::thread b(writeY);
+	a.join();
+	b.join();
+	std::cout << r1 << r2 << std::endl;
+
+	return 0;
+}
+
 int main()
 {
-	A1 a(1), b(2);
-	A1& r = a;
-	r.id = 11;
-	r = b;
-	r.id = 21;
 	testItrPtr();
+	testAtomic();
 }
