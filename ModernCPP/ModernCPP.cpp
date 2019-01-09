@@ -58,6 +58,7 @@ bool addItem(vector<A1>& vec, int id, string str)
 }
 int testItrPtr()
 {
+	cout << "Starts to test Pointers" << endl;
 	A1 a(1), b(2);
 	A1& r = a;
 	r.id = 11;
@@ -88,6 +89,7 @@ void writeY() {
 }
 int testAtomic()
 {
+	cout << endl << "Starts to test Atomic" << endl;
 	x = 0;
 	y = 0;
 	std::thread a(writeX);
@@ -99,8 +101,68 @@ int testAtomic()
 	return 0;
 }
 
+#include <mutex>              // std::mutex, std::unique_lock
+#include <condition_variable> // std::condition_variable
+std::mutex mtx;
+std::condition_variable cv;
+bool ready = false;
+void print_id(int id) {
+	std::unique_lock<std::mutex> lck(mtx);
+	while (!ready) cv.wait(lck);
+	// ...
+	std::cout << "thread " << id << '\n';
+}
+void go() {
+	std::unique_lock<std::mutex> lck(mtx);
+	ready = true;
+	cv.notify_all();
+}
+int testConditionVariable()
+{
+	cout << endl << "Starts to test ConditionVariable" << endl;
+	std::thread threads[10];
+	// spawn 10 threads:
+	for (int i = 0; i < 10; ++i)
+		threads[i] = std::thread(print_id, i);
+
+	cout << "10 threads ready to race...\n";
+	go();                       // go!
+
+	for (auto& th : threads) th.join();
+
+	return 0;
+}
+
+#include <future>         // std::async, std::future
+#include <chrono>         // std::chrono::milliseconds
+// a non-optimized way of checking for prime numbers:
+bool is_prime(int x) {
+	for (int i = 2; i <= x/2; ++i) if (x%i == 0) return false;
+	return true;
+}
+int testFuture()
+{
+	cout << endl << "Starts to test Future" << endl;
+	// call function asynchronously:
+	std::future<bool> fut = std::async(is_prime, 444444443);
+
+	// do something while waiting for function to set future:
+	std::cout << "checking, please wait";
+	std::chrono::milliseconds span(100);
+	while (fut.wait_for(span) == std::future_status::timeout)
+		std::cout << '.' << std::flush;
+
+	bool x = fut.get();     // retrieve return value
+
+	std::cout << "\n444444443 " << (x ? "is" : "is not") << " prime.\n";
+
+	return 0;
+}
+
 int main()
 {
 	testItrPtr();
 	testAtomic();
+	testConditionVariable();
+	testFuture();
 }
