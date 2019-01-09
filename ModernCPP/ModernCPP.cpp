@@ -22,27 +22,39 @@ struct A1
 		return id == other.id;
 	}
 };
+using A1UniquePtr = unique_ptr<A1, void(*)(A1 const*)>;
+void A1DeleterNothing(A1 const* ins) { }
+void A1DeleterDefault(A1 const* ins) 
+{ 
+	delete ins;
+	//ins = nullptr;
+}
 bool addItem(vector<A1>& vec, int id, string str)
 {
 	A1 a(id);
 	A1& theA = a;
+	A1UniquePtr pA(nullptr, nullptr);
 	//shared_ptr<A1> pA = nullptr;
-	A1* pA = nullptr;
+	//A1* pA = nullptr;
 	bool hasFound = false;
 
 	auto itr = find(vec.begin(), vec.end(), A1(id));
 	if (itr != vec.end())
 	{
-		pA = &(*itr);
+		//pA = A1UniquePtr(&(*itr), [](A1 const*) {});
+		pA = A1UniquePtr(&(*itr), A1DeleterNothing);
 		//pA = make_shared<A1>(*itr);	// Does NOT work, point to another instance.
 		//pA = shared_ptr<A1>(&(*itr), [](A1 const*) {}); // works!
+		//pA = &(*itr);
 		hasFound = true;
 		//theA = *itr; // Does NOT work, still reference to a
 	}
 	if (!hasFound)
 	{
-		pA = new A1(id);
-		//pA = make_shared<A1>(A1(id));
+		//pA = A1UniquePtr(new A1(id), [](A1 const* ptr) {delete ptr; });
+		pA = A1UniquePtr(new A1(id), A1DeleterDefault);	//default_delete<A1>()
+		//pA = shared_ptr<A1>(new A1(id));
+		//pA = new A1(id);
 	}
 	
 	pA->strings.push_back(str);
@@ -56,14 +68,26 @@ bool addItem(vector<A1>& vec, int id, string str)
 
 	return true;
 }
-int testItrPtr()
+int testRefrence()
 {
-	cout << "Starts to test Pointers" << endl;
+	cout << "Starts to test Refrences" << endl;
 	A1 a(1), b(2);
 	A1& r = a;
 	r.id = 11;
 	r = b;	// still point to a, but not b
 	r.id = 21;
+	cout << "b.id = " << b.id << endl;	// 2
+
+	A1& r2 = (b.id == 2) ? b : a;
+	r2.id = 3;
+	cout << "a.id = " << a.id << endl;
+	cout << "b.id = " << b.id << endl;
+
+	return 0;
+}
+int testItrPtr()
+{
+	cout << endl << "Starts to test Pointers" << endl;
 
 	vector<A1> list;
 	addItem(list, 1, "CHN");
@@ -72,6 +96,16 @@ int testItrPtr()
 	addItem(list, 2, "DUT");
 	addItem(list, 1, "CHS");
 
+	for_each (list.cbegin(), list.cend(), [&](A1 v)
+	{
+		cout << "v.id = " << v.id << ", v.strings = {" ;
+		for (auto& s : v.strings) 
+		{ 
+			cout << s.c_str() << ", ";
+		}
+		cout << "}" << endl;
+	});
+
 	return 0;
 }
 
@@ -79,11 +113,13 @@ int testItrPtr()
 #include <thread>
 std::atomic_int x, y;
 int r1, r2;
-void writeX() {
+void writeX() 
+{
 	x.store(1);
 	r1 = y.load();
 }
-void writeY() {
+void writeY() 
+{
 	y.store(1);
 	r2 = x.load();
 }
@@ -106,13 +142,14 @@ int testAtomic()
 std::mutex mtx;
 std::condition_variable cv;
 bool ready = false;
-void print_id(int id) {
+void print_id(int id) 
+{
 	std::unique_lock<std::mutex> lck(mtx);
 	while (!ready) cv.wait(lck);
-	// ...
 	std::cout << "thread " << id << '\n';
 }
-void go() {
+void go() 
+{
 	std::unique_lock<std::mutex> lck(mtx);
 	ready = true;
 	cv.notify_all();
@@ -136,7 +173,8 @@ int testConditionVariable()
 #include <future>         // std::async, std::future
 #include <chrono>         // std::chrono::milliseconds
 // a non-optimized way of checking for prime numbers:
-bool is_prime(int x) {
+bool is_prime(int x) 
+{
 	for (int i = 2; i <= x/2; ++i) if (x%i == 0) return false;
 	return true;
 }
@@ -159,10 +197,44 @@ int testFuture()
 	return 0;
 }
 
+void helloFunction() 
+{
+	cout << "function" << endl;
+}
+class HelloFunctionObject 
+{
+public:
+	void operator()() const 
+	{
+		cout << "function object" << endl;
+	}
+};
+int testThread()
+{
+	cout << endl << "Starts to test Thread" << endl;
+	thread t1(helloFunction); // function
+	HelloFunctionObject helloFunctionObject;
+	thread t2(helloFunctionObject); // function object
+	thread t3([] { cout << "lambda function"; }); // lambda function
+
+	t1.join();
+	t2.join();
+	t3.join();
+	
+	return 0;
+}
+
+
+
+
 int main()
 {
+	testRefrence();
 	testItrPtr();
 	testAtomic();
 	testConditionVariable();
 	testFuture();
+	testThread();
+
+	return 0;
 }
